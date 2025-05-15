@@ -95,7 +95,7 @@ def on_message(client, userdata, msg):
             return
 
         tag_pos, distance_xy = result
-        print(f"Tag @ X={tag_pos[0]:.2f}, Y={tag_pos[1]:.2f}, Z={tag_pos[2]:.2f} | Dist XY = {distance_xy:.2f}m")
+        print(f"{msg.topic.split('/')[-1]} Tag @ X={tag_pos[0]:.2f}, Y={tag_pos[1]:.2f}, Z={tag_pos[2]:.2f} | Dist XY = {distance_xy:.2f}m")
 
         # === 繪圖資料更新 ===
         tag_positions = {topic: pos for topic, pos in positions}  # 使用字典儲存每個TAG的最新位置
