@@ -6,6 +6,30 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
+class SimpleKalman:
+    def __init__(self, process_var=1.0, measure_var=10.0):
+        self.x = 0.0        # 狀態（azimuth）
+        self.P = 1000.0     # 不確定性
+        self.Q = process_var
+        self.R = measure_var
+        self.initialized = False
+
+    def update(self, measurement):
+        if not self.initialized:
+            self.x = measurement
+            self.initialized = True
+            return self.x
+
+        # Prediction step
+        self.P = self.P + self.Q
+
+        # Update step
+        K = self.P / (self.P + self.R)
+        self.x = self.x + K * (measurement - self.x)
+        self.P = (1 - K) * self.P
+
+        return self.x
+
 # === 旋轉函式 ===
 def rotate_vector(vector, x_deg, y_deg, z_deg):
     x_rad, y_rad, z_rad = np.radians([x_deg, y_deg, z_deg])
@@ -110,6 +134,7 @@ def on_connect(client, userdata, flags, rc):
 
 # === MQTT 接收資料時 ===
 def on_message(client, userdata, msg):
+    kf_dict = {}  # {tag_id: {'az': Kalman, 'el': Kalman}}
     global last_azimuth
     global positions
     try:
@@ -120,11 +145,17 @@ def on_message(client, userdata, msg):
         az_std = data.get("azimuth_stdev", 0)
         el_std = data.get("elevation_stdev", 0)
 
-        # 多 tag 判斷 azimuth 跳動
-        if handle_azimuth_filter(tag_id, az):
-            return  # 若為異常值就直接丟掉
+        # 為每個 tag 初始化 Kalman 濾波器（az + el 各一個）
+        if tag_id not in kf_dict:
+            kf_dict[tag_id] = {
+                'az': SimpleKalman(process_var=1.0, measure_var=10.0),
+                'el': SimpleKalman(process_var=1.0, measure_var=10.0)
+            }
+        # 濾波處理
+        smoothed_az = kf_dict[tag_id]['az'].update(az)
+        smoothed_el = kf_dict[tag_id]['el'].update(el)
 
-        result = compute_position_from_az_el_height(az, el, BASE_POSITION, ORIENTATION, TAG_HEIGHT)
+        result = compute_position_from_az_el_height(smoothed_az, smoothed_el, BASE_POSITION, ORIENTATION, TAG_HEIGHT)
         if result is None:
             print("Direction too flat, skipped.")
             return
