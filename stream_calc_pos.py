@@ -61,9 +61,9 @@ def handle_azimuth_filter(tag_id, azimuth):
         return False
 
 # === 基地台參數 ===
-BASE_POSITION = [0.0, 0.0, 1.4]     # 基地台位置 (X, Y, Z)
-ORIENTATION = (90.0, 0.0, 180.0)    # 基地台朝向 (X, Y, Z) 旋轉角度
-TAG_HEIGHT = 0.0                    # 標籤高度 (Z) 相對於基地台的高度    
+BASE_POSITION = [0.0, 0.0, 1.4]     # 基地台位置 (X, Y, Z) 公尺
+TAG_HEIGHT = 0.0                    # 標籤高度 (Z) 相對於基地台的高度   
+ORIENTATION = (90.0, 0.0, 180.0)    # 基地台朝向 (X, Y, Z) 旋轉角度 
 
 # === 繪圖初始化 ===
 plt.ion()

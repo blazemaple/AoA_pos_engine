@@ -22,7 +22,7 @@ pip install -r requirements.txt
 - Topic: `silabs/aoa/config/ble-pd-0CAE5F9301A8/+`
 
 ## 基地台參數
-`stream_calc_pos.py` 的 31 行至 33 行
+`stream_calc_pos.py` 的 64 行至 66 行
 ```
 BASE_POSITION = [0.0, 0.0, 1.4]     # 基地台位置 (X, Y, Z)
 ORIENTATION = (90.0, 0.0, 180.0)    # 基地台朝向 (X, Y, Z) 旋轉角度
