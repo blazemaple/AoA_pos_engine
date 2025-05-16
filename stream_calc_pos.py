@@ -27,6 +27,39 @@ def compute_position_from_az_el_height(azimuth_deg, elevation_deg, base_position
     horizontal_distance = np.linalg.norm((tag_position - base_position)[:2])
     return tag_position, horizontal_distance
 
+def angle_diff_deg(a1, a2):
+    """計算循環角度的差異（處理 -180°~180°）"""
+    delta = (a2 - a1 + 180) % 360 - 180
+    return abs(delta)
+
+def handle_azimuth_filter(tag_id, azimuth):
+    global last_azimuths, azimuth_ready
+
+    # 如果是第一筆：先記下但不判斷跳動
+    if tag_id not in last_azimuths:
+        last_azimuths[tag_id] = azimuth
+        azimuth_ready[tag_id] = False
+        print(f"✅ {tag_id} 第一筆 azimuth 接收：{azimuth:.2f}°（暫不檢查跳動）")
+        return False  # 不濾掉
+
+    # 如果是第二筆起才判斷跳動
+    delta = angle_diff_deg(last_azimuths[tag_id], azimuth)
+    if not azimuth_ready[tag_id]:
+        if delta < MAX_AZIMUTH_JUMP:
+            azimuth_ready[tag_id] = True
+            last_azimuths[tag_id] = azimuth
+            print(f"✅ {tag_id} azimuth 穩定：Δ={delta:.1f}°，正式開始檢查")
+            return False
+        else:
+            print(f"⚠️ {tag_id} 初始 azimuth 跳動過大（Δ={delta:.1f}°），忽略此筆")
+            return True  # 濾掉這筆，但不更新 last_azimuth
+    else:
+        if delta > MAX_AZIMUTH_JUMP:
+            print(f"⚠️ {tag_id} azimuth 突變（Δ={delta:.1f}°），忽略此筆")
+            return True
+        last_azimuths[tag_id] = azimuth
+        return False
+
 # === 基地台參數 ===
 BASE_POSITION = [0.0, 0.0, 1.4]     # 基地台位置 (X, Y, Z)
 ORIENTATION = (90.0, 0.0, 180.0)    # 基地台朝向 (X, Y, Z) 旋轉角度
@@ -61,6 +94,9 @@ positions = []
 # === 檔案與濾波參數 ===
 CSV_FILE = "aoa_mqtt_log.csv"
 MAX_STDEV = 10.0  # elevation or azimuth 標準差容忍度
+last_azimuths = {}
+azimuth_ready = {}  # 是否已經確認該 tag 的 azimuth 是穩定的
+MAX_AZIMUTH_JUMP = 30  # azimuth 跳動容忍度
 
 # === MQTT 參數設定 ===
 BROKER = "192.168.1.10"  # 替換為你的 MQTT Broker 地址
@@ -74,20 +110,19 @@ def on_connect(client, userdata, flags, rc):
 
 # === MQTT 接收資料時 ===
 def on_message(client, userdata, msg):
+    global last_azimuth
     global positions
     try:
+        tag_id = msg.topic.split("/")[-1]
         data = json.loads(msg.payload.decode('utf-8'))
         az = data.get("azimuth")
         el = data.get("elevation")
         az_std = data.get("azimuth_stdev", 0)
         el_std = data.get("elevation_stdev", 0)
 
-        if az is None or el is None:
-            print("Missing AoA data")
-            return
-        if az_std > MAX_STDEV or el_std > MAX_STDEV:
-            print("Filtered due to high stddev")
-            return
+        # 多 tag 判斷 azimuth 跳動
+        if handle_azimuth_filter(tag_id, az):
+            return  # 若為異常值就直接丟掉
 
         result = compute_position_from_az_el_height(az, el, BASE_POSITION, ORIENTATION, TAG_HEIGHT)
         if result is None:
